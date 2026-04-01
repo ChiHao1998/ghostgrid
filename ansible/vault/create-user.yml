@@ -1,0 +1,129 @@
+---
+- name: Login as admin, create restricted user, and bind to KV engine
+  hosts: localhost
+  connection: local
+  gather_facts: no
+  collections:
+    - community.hashi_vault
+
+  vars:
+    ansible_python_interpreter: "{{ (lookup('env', 'VIRTUAL_ENV') | default('.venv')) + '/bin/python' }}"
+    vault_addr: "http://127.0.0.1:8200"
+    auth_mount_path: "userpass"
+    kv_version: "2"
+
+  vars_prompt:
+    - name: "admin_username"
+      prompt: "Enter admin username"
+      private: no
+      default: "admin"
+
+    - name: "admin_password"
+      prompt: "Enter admin password"
+      private: yes
+
+    - name: "new_username"
+      prompt: "Enter new username to create"
+      private: no
+
+    - name: "new_user_password"
+      prompt: "Enter password for new user"
+      private: yes
+
+    - name: "mount_path"
+      prompt: "Enter KV mount path to bind (example: app, config, persona)"
+      private: no
+
+  tasks:
+    # 🔑 Login as admin
+    - name: Login admin via userpass to get token
+      uri:
+        url: "{{ vault_addr }}/v1/auth/{{ auth_mount_path }}/login/{{ admin_username }}"
+        method: POST
+        headers:
+          Content-Type: "application/json"
+        body: "{{ {'password': admin_password} | to_json }}"
+        return_content: yes
+        status_code: 200
+      register: login_result
+      failed_when: login_result.status != 200
+
+    - name: Save admin token (vault_token)
+      set_fact:
+        vault_token: "{{ login_result.json.auth.client_token }}"
+
+    - name: Confirm login success
+      debug:
+        msg: "Login successful — received admin token (length {{ vault_token | length }})."
+
+    # 🔍 Check and enable KV engine if missing
+    - name: List currently enabled mounts
+      uri:
+        url: "{{ vault_addr }}/v1/sys/mounts"
+        method: GET
+        headers:
+          "X-Vault-Token": "{{ vault_token }}"
+        return_content: yes
+        status_code: 200
+      register: mounts_result
+
+    - name: Determine if requested mount exists
+      set_fact:
+        mount_exists: "{{ (mount_path + '/') in (mounts_result.json | default({})) }}"
+
+    - name: Fail if KV engine does not exist
+      fail:
+        msg: "❌ KV engine '{{ mount_path }}/' does not exist. Please create it before running this playbook."
+      when: not mount_exists
+
+    - name: Debug - mount exists
+      debug:
+        msg: "✅ KV engine '{{ mount_path }}/' verified to exist."
+
+    # 🧾 Create a restricted policy for the new user
+    - name: Build user policy for KV engine
+      set_fact:
+        user_policy: |
+          path "{{ mount_path }}/*" {
+            capabilities = ["read", "list"]
+          }
+
+    - name: Write new policy for user
+      uri:
+        url: "{{ vault_addr }}/v1/sys/policies/acl/{{ new_username }}"
+        method: PUT
+        headers:
+          "X-Vault-Token": "{{ vault_token }}"
+          Content-Type: "application/json"
+        body: "{{ {'policy': user_policy} | to_json }}"
+        status_code: [200, 204]
+      register: policy_result
+      failed_when: policy_result.status not in [200, 204]
+
+    - name: Confirm policy creation
+      debug:
+        msg: "Created policy '{{ new_username }}' with read-only access to '{{ mount_path }}/*'."
+
+    # 👤 Create new user (only admin/root editable)
+    - name: Create new user under userpass
+      uri:
+        url: "{{ vault_addr }}/v1/auth/{{ auth_mount_path }}/users/{{ new_username }}"
+        method: POST
+        headers:
+          "X-Vault-Token": "{{ vault_token }}"
+          Content-Type: "application/json"
+        body: "{{ {'password': new_user_password, 'policies': new_username} | to_json }}"
+        status_code: [200, 204]
+      register: create_user_result
+      failed_when: create_user_result.status not in [200, 204]
+
+    - name: Confirm user creation
+      debug:
+        msg: "New user '{{ new_username }}' created successfully with policy '{{ new_username }}'."
+
+    # ✅ Final summary
+    - name: Summary
+      debug:
+        msg:
+          - "✅ New user '{{ new_username }}' created and bound to KV engine '{{ mount_path }}'."
+          - "🔒 Only admin/root can modify or delete this user."
