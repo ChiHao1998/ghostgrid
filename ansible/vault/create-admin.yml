@@ -1,0 +1,129 @@
+---
+- name: Create Vault Admin
+  hosts: localhost
+  connection: local
+  gather_facts: no
+  collections:
+    - community.hashi_vault
+
+  vars:
+    ansible_python_interpreter: "{{ (lookup('env', 'VIRTUAL_ENV') | default('.venv')) + '/bin/python' }}"
+    vault_addr: "http://127.0.0.1:8200"
+    admin_policy: |
+      path "sys/*" {
+        capabilities = ["create", "read", "update", "delete", "list", "sudo"]
+      }
+      path "auth/*" {
+        capabilities = ["create", "read", "update", "delete", "list", "sudo"]
+      }
+      path "sys/mounts/*" {
+        capabilities = ["create", "read", "update", "delete", "list", "sudo"]
+      }
+      path "secret/*" {
+        capabilities = ["create", "read", "update", "delete", "list"]
+      }
+      path "auth/token/*" {
+        capabilities = ["create", "read", "update", "delete", "list", "sudo"]
+      }
+
+  vars_prompt:
+    - name: "vault_token"
+      prompt: "Enter your Vault root token"
+      private: yes
+
+    - name: "admin_password"
+      prompt: "Enter admin password"
+      private: yes
+
+  tasks:
+    - name: Get existing admin policy
+      community.hashi_vault.vault_read:
+        url: "{{ vault_addr }}"
+        token: "{{ vault_token }}"
+        path: "sys/policies/acl/admin"
+      register: current_policy
+      failed_when: false   # don’t fail if policy not found
+
+    - name: Upload admin policy if missing
+      community.hashi_vault.vault_write:
+        url: "{{ vault_addr }}"
+        token: "{{ vault_token }}"
+        path: "sys/policies/acl/admin"
+        data:
+          policy: "{{ admin_policy }}"
+      register: policy_result
+      when: current_policy is failed or (current_policy.data is not defined)
+
+    - name: Result
+      debug:
+        msg: >-
+          {% if current_policy is failed or (current_policy.data is not defined) %}
+            Policy 'admin' did not exist — created new one.
+          {% else %}
+            Policy 'admin' already exists — skipped update.
+          {% endif %}
+
+    - name: Get vault authentication method
+      uri:
+        url: "{{ vault_addr }}/v1/sys/auth"
+        method: GET
+        headers:
+          "X-Vault-Token": "{{ vault_token }}"
+      register: auth_methods
+
+    - name: Enable userpass authentication method
+      uri:
+        url: "{{ vault_addr }}/v1/sys/auth/userpass"
+        method: POST
+        headers:
+          "X-Vault-Token": "{{ vault_token }}"
+        body_format: json
+        body:
+          type: "userpass"
+          description: "Userpass auth method"
+        status_code: [200, 204]
+      when: "'userpass/' not in auth_methods.json"
+      register: userpass_result
+      changed_when: userpass_result.status == 200
+
+    - name: Result
+      debug:
+        var: userpass_result
+
+    # ----------------------------
+
+    - name: Upsert admin user
+      community.hashi_vault.vault_write:
+        url: "{{ vault_addr }}"
+        token: "{{ vault_token }}"
+        path: "auth/userpass/users/admin"
+        data:
+          password: "{{ admin_password }}"
+          policies: "admin"
+      register: admin_user_result
+
+    - name: Result
+      debug:
+        var: admin_user_result
+
+    - name: Get token (backup access)
+      community.hashi_vault.vault_token_create:
+        url: "{{ vault_addr }}"
+        token: "{{ vault_token }}"
+        policies:
+          - "admin"
+        no_parent: true
+        renewable: true
+      register: admin_token
+
+    - name: Result
+      debug:
+        var: admin_token
+
+    - name: Show admin credentials (⚠️  do not log in CI/CD!)
+      debug:
+        msg:
+          - "Admin username: admin"
+          - "Admin password: {{ admin_password }}"
+          - "Admin token: {{ admin_token.login.auth.client_token | default(admin_token.json.auth.client_token | default('N/A')) }}"
+

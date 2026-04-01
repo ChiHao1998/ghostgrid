@@ -1,0 +1,105 @@
+---
+- name: Create Vault PostgreSQL database role
+  hosts: localhost
+  connection: local
+  gather_facts: no
+
+  vars:
+    ansible_python_interpreter: "{{ (lookup('env', 'VIRTUAL_ENV') | default('.venv')) + '/bin/python' }}"
+    vault_addr: "http://127.0.0.1:8200"
+    auth_mount_path: "userpass"
+    creation_statements: |
+      CREATE ROLE "{{name}}" WITH LOGIN PASSWORD '{{password}}' VALID UNTIL '{{expiration}}';
+      GRANT ALL PRIVILEGES ON DATABASE "{{ database_name }}" TO "{{name}}";
+      GRANT ALL ON SCHEMA public TO "{{name}}";
+      ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO "{{name}}";
+      GRANT ALL ON ALL TABLES IN SCHEMA public TO "{{name}}";
+      GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO "{{name}}";
+
+  vars_prompt:
+    - name: vault_admin_username
+      prompt: "Vault admin username"
+      default: "admin"
+      private: no
+
+    - name: vault_admin_password
+      prompt: "Vault admin password"
+      private: yes
+
+    - name: engine_name
+      prompt: "Vault database engine name"
+      private: no
+
+    - name: role_name
+      prompt: "Vault database role name"
+      private: no
+
+    - name: database_name
+      prompt: "Database name"
+      private: no
+
+    - name: default_ttl
+      prompt: "Default TTL for credentials (e.g. 1h)"
+      private: no
+      default: "1h"
+
+    - name: max_ttl
+      prompt: "Max TTL for credentials (e.g. 24h)"
+      private: no
+      default: "24h"
+
+  tasks:
+    # --------------------------------------------------
+    # Login
+    # --------------------------------------------------
+    - name: Login to Vault
+      uri:
+        url: "{{ vault_addr }}/v1/auth/{{ auth_mount_path }}/login/{{ vault_admin_username }}"
+        method: POST
+        headers:
+          Content-Type: "application/json"
+        body: "{{ {'password': vault_admin_password} | to_json }}"
+        return_content: yes
+        status_code: 200
+      register: vault_login
+
+    - set_fact:
+        vault_token: "{{ vault_login.json.auth.client_token }}"
+
+    # --------------------------------------------------
+    # Ensure database engine exists
+    # --------------------------------------------------
+    - name: Enable database engine if missing
+      uri:
+        url: "{{ vault_addr }}/v1/sys/mounts/{{ engine_name }}"
+        method: POST
+        headers:
+          X-Vault-Token: "{{ vault_token }}"
+          Content-Type: "application/json"
+        body: "{{ {'type': 'database'} | to_json }}"
+        status_code: [200, 204, 400]
+      register: enable_engine
+      ignore_errors: yes
+
+    # --------------------------------------------------
+    # Create Vault database role
+    # --------------------------------------------------
+    - name: Create Vault database role
+      uri:
+        url: "{{ vault_addr }}/v1/{{engine_name}}/roles/{{ role_name }}"
+        method: POST
+        headers:
+          X-Vault-Token: "{{ vault_token }}"
+          Content-Type: "application/json"
+        body: "{{ {
+          'db_name': database_name,
+          'creation_statements': creation_statements,
+          'default_ttl': default_ttl,
+          'max_ttl': max_ttl
+        } | to_json }}"
+        status_code: [200, 204]
+
+
+    - name: Done
+      debug:
+        msg: "Vault database role '{{ role_name }}' created for engine '{{ engine_name }}'."
