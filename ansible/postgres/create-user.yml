@@ -1,0 +1,90 @@
+---
+- name: Create PostgreSQL user and database
+  hosts: localhost
+  connection: local
+  gather_facts: no
+  collections:
+    - community.postgresql
+
+  vars:
+    ansible_python_interpreter: "{{ (lookup('env', 'VIRTUAL_ENV') | default('.venv')) + '/bin/python' }}"
+    pg_host: "127.0.0.1"
+    pg_port: 5432
+    pg_admin_user: "postgres"
+
+  vars_prompt:
+    - name: "pg_admin_password"
+      prompt: "Enter postgres superuser password"
+      private: yes
+
+    - name: "db_name"
+      prompt: "Enter database name to create"
+      private: no
+
+    - name: "db_user"
+      prompt: "Enter database user to create"
+      private: no
+
+    - name: "db_user_password"
+      prompt: "Enter password for database user"
+      private: yes
+
+  tasks:
+    # 🧪 Sanity check
+    - name: Check PostgreSQL connectivity
+      community.postgresql.postgresql_ping:
+        login_host: "{{ pg_host }}"
+        login_port: "{{ pg_port }}"
+        login_user: "{{ pg_admin_user }}"
+        login_password: "{{ pg_admin_password }}"
+
+    # 👤 Create DB user
+    - name: Create PostgreSQL user
+      community.postgresql.postgresql_user:
+        name: "{{ db_user }}"
+        password: "{{ db_user_password }}"
+        login_host: "{{ pg_host }}"
+        login_port: "{{ pg_port }}"
+        login_user: "{{ pg_admin_user }}"
+        login_password: "{{ pg_admin_password }}"
+        role_attr_flags: LOGIN
+      register: user_result
+
+    - name: Confirm user creation
+      debug:
+        msg: "✅ PostgreSQL user '{{ db_user }}' created or already exists."
+
+    # 🗄️ Create database
+    - name: Create PostgreSQL database
+      community.postgresql.postgresql_db:
+        name: "{{ db_name }}"
+        owner: "{{ db_user }}"
+        login_host: "{{ pg_host }}"
+        login_port: "{{ pg_port }}"
+        login_user: "{{ pg_admin_user }}"
+        login_password: "{{ pg_admin_password }}"
+      register: db_result
+
+    - name: Confirm database creation
+      debug:
+        msg: "✅ Database '{{ db_name }}' created and owned by '{{ db_user }}'."
+
+    # 🔐 Grant privileges (explicit, industry-style)
+    - name: Grant all privileges on database
+      community.postgresql.postgresql_privs:
+        db: "{{ db_name }}"
+        roles: "{{ db_user }}"
+        type: database
+        privs: ALL
+        login_host: "{{ pg_host }}"
+        login_port: "{{ pg_port }}"
+        login_user: "{{ pg_admin_user }}"
+        login_password: "{{ pg_admin_password }}"
+
+    - name: Summary
+      debug:
+        msg:
+          - "🎉 PostgreSQL setup completed"
+          - "👤 User: {{ db_user }}"
+          - "🗄️ Database: {{ db_name }}"
+          - "🔑 User has full access to its database"
