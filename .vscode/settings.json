@@ -8,5 +8,10 @@
         "activityBarBadge.foreground": "#15202b",
         "sash.hoverBorder": "#9266c7"
     },
-    "peacock.remoteColor": "#7843b7"
+    "peacock.remoteColor": "#7843b7",
+    "conventionalCommits.scopes": [
+        "terraform",
+        "script",
+        "ansible"
+    ]
 }
