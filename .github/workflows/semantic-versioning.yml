@@ -14,7 +14,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -23,8 +23,10 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           npx \
-            -p semantic-release \
-            -p @semantic-release/commit-analyzer \
-            -p @semantic-release/release-notes-generator \
-            -p @semantic-release/github \
+              -p semantic-release \
+              -p @semantic-release/commit-analyzer \
+              -p @semantic-release/release-notes-generator \
+              -p @semantic-release/changelog \
+              -p @semantic-release/git \
+              -p @semantic-release/github \
             semantic-release
