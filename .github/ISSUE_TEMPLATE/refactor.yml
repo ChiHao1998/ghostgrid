@@ -1,0 +1,29 @@
+name: 🔧 Refactor
+description: Improve internal structure without changing behavior
+title: "[REFACTOR] "
+labels: ["refactor"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Current Problem
+    validations:
+      required: true
+
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal
+
+  - type: textarea
+    id: direction
+    attributes:
+      label: Suggested Direction
+
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety Checks
+      options:
+        - label: No behavior change expected
+        - label: Existing tests still pass

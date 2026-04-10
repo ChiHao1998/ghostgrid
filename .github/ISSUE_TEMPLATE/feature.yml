@@ -1,0 +1,26 @@
+name: ✨ Feature Request
+description: Suggest a new feature
+title: "[FEAT] "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to Solve
+    validations:
+      required: true
+
+  - type: textarea
+    id: idea
+    attributes:
+      label: Proposed Idea
+
+  - type: textarea
+    id: value
+    attributes:
+      label: Why It Matters
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
