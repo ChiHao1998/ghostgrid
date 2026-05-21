@@ -1,0 +1,94 @@
+---
+- name: Setup Quartz PostgreSQL schema and role
+  hosts: localhost
+  connection: local
+  gather_facts: no
+  collections:
+    - community.postgresql
+
+  vars:
+    ansible_python_interpreter: "{{ (lookup('env', 'VIRTUAL_ENV') | default('.venv')) + '/bin/python' }}"
+    pg_host: "127.0.0.1"
+    pg_port: 5432
+    pg_admin_user: "postgres"
+
+  vars_prompt:
+    - name: "pg_admin_password"
+      prompt: "Enter postgres superuser password"
+      private: yes
+
+    - name: "quartz_db_name"
+      prompt: "Enter database name for Quartz"
+      private: no
+
+    - name: "quartz_user"
+      prompt: "Enter Quartz database user"
+      private: no
+
+    - name: "quartz_user_password"
+      prompt: "Enter password for Quartz user"
+      private: yes
+
+  tasks:
+
+    # 🧪 Connectivity check
+    - name: Check PostgreSQL connectivity
+      community.postgresql.postgresql_ping:
+        login_host: "{{ pg_host }}"
+        login_port: "{{ pg_port }}"
+        login_user: "{{ pg_admin_user }}"
+        login_password: "{{ pg_admin_password }}"
+
+    # 👤 Create Quartz user
+    - name: Create Quartz PostgreSQL role
+      community.postgresql.postgresql_user:
+        name: "{{ quartz_user }}"
+        password: "{{ quartz_user_password }}"
+        login_host: "{{ pg_host }}"
+        login_port: "{{ pg_port }}"
+        login_user: "{{ pg_admin_user }}"
+        login_password: "{{ pg_admin_password }}"
+        role_attr_flags: LOGIN
+      register: quartz_user_result
+
+    - name: Confirm Quartz user creation
+      debug:
+        msg: "✅ Quartz user '{{ quartz_user }}' is ready."
+
+    # 🗄️ Create schema
+    - name: Create Quartz schema
+      community.postgresql.postgresql_schema:
+        name: "quartz"
+        database: "{{ quartz_db_name }}"
+        owner: "{{ quartz_user }}"
+        login_host: "{{ pg_host }}"
+        login_port: "{{ pg_port }}"
+        login_user: "{{ pg_admin_user }}"
+        login_password: "{{ pg_admin_password }}"
+      register: quartz_schema_result
+
+    - name: Confirm schema creation
+      debug:
+        msg: "✅ Schema 'quartz' ensured in database '{{ quartz_db_name }}'."
+
+    # 🔐 Grant schema privileges
+    - name: Grant schema privileges to Quartz user
+      community.postgresql.postgresql_privs:
+        db: "{{ quartz_db_name }}"
+        roles: "{{ quartz_user }}"
+        type: schema
+        objs: quartz
+        privs: USAGE,CREATE
+        login_host: "{{ pg_host }}"
+        login_port: "{{ pg_port }}"
+        login_user: "{{ pg_admin_user }}"
+        login_password: "{{ pg_admin_password }}"
+
+    - name: Confirm Quartz initialization
+      debug:
+        msg:
+          - "🎉 Quartz setup completed"
+          - "👤 User: {{ quartz_user }}"
+          - "🗄️ Database: {{ quartz_db_name }}"
+          - "📦 Schema: quartz"
+          - "⏱️ Scheduler storage ready"
