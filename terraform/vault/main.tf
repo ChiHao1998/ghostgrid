@@ -65,7 +65,7 @@ resource "docker_container" "vault" {
   }
 
   # Run Vault in server mode using the generated config
-  command = ["server"]
+  command = ["server", "-config=/vault/config/vault-config.json"]
 
   env = [
     "VAULT_ADDR=${var.vault_addr}",
