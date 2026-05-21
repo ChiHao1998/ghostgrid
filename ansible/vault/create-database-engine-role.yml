@@ -8,13 +8,13 @@
     ansible_python_interpreter: "{{ (lookup('env', 'VIRTUAL_ENV') | default('.venv')) + '/bin/python' }}"
     vault_addr: "http://127.0.0.1:8200"
     auth_mount_path: "userpass"
-    creation_statements: |
-      CREATE ROLE "{{name}}" WITH LOGIN PASSWORD '{{password}}' VALID UNTIL '{{expiration}}';
-      GRANT ALL PRIVILEGES ON DATABASE "{{ database_name }}" TO "{{name}}";
-      GRANT ALL ON SCHEMA public TO "{{name}}";
-      ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO "{{name}}";
-      GRANT ALL ON ALL TABLES IN SCHEMA public TO "{{name}}";
-      GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO "{{name}}";
+    creation_statements: >-
+      CREATE ROLE "{{ '{{name}}' }}" WITH LOGIN PASSWORD '{{ '{{password}}' }}' VALID UNTIL '{{ '{{expiration}}' }}';
+      GRANT ALL PRIVILEGES ON DATABASE "{{ database_name }}" TO "{{ '{{name}}' }}";
+      GRANT ALL ON SCHEMA public TO "{{ '{{name}}' }}";
+      ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO "{{ '{{name}}' }}";
+      GRANT ALL ON ALL TABLES IN SCHEMA public TO "{{ '{{name}}' }}";
+      GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO "{{ '{{name}}' }}";
 
   vars_prompt:
     - name: vault_admin_username
