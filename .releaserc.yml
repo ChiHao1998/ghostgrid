@@ -6,10 +6,11 @@ plugins:
   - "@semantic-release/release-notes-generator"
   - - "@semantic-release/exec"
     - prepareCmd: >
-        tar -czf ghostgrid-${nextRelease.version}.tar.gz
+        tar -czf /tmp/ghostgrid-${nextRelease.version}.tar.gz
         --exclude=.git
         --exclude="*.tar.gz"
-        .
+        . &&
+        mv /tmp/ghostgrid-${nextRelease.version}.tar.gz .
   - - "@semantic-release/github"
     - assets:
         - path: "ghostgrid-*.tar.gz"
