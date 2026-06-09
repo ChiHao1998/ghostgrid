@@ -1,0 +1,50 @@
+name: Refactor
+description: Internal restructure with no behaviour change
+labels: ["refactor"]
+body:
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - TUI logic (script/tui.sh)
+        - Shared lib (lib/)
+        - Service run.sh
+        - Init (script/init.sh)
+        - Cross-cutting (multiple files)
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: current-pain
+    attributes:
+      label: Current pain
+      placeholder: What's hard to read, extend, or debug right now
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed-structure
+    attributes:
+      label: Proposed structure
+    validations:
+      required: true
+
+  - type: textarea
+    id: behaviour-unchanged
+    attributes:
+      label: How you'll verify no behaviour change
+      placeholder: |
+        Run sudo bash main.sh, exercise all services before and after.
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: guardrails
+    attributes:
+      label: Guardrails
+      options:
+        - label: No new features snuck in
+        - label: Pitfalls respected — `set -e`, `/dev/tty`, `$GHOSTGRID_ROOT`, no sudo in service scripts
+        - label: Existing service scripts still work unchanged

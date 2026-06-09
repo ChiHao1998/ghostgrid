@@ -1,0 +1,69 @@
+name: Bug Report
+description: Something broken — TUI, service, Terraform, init
+labels: ["bug"]
+body:
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - TUI / menu navigation
+        - Service install (terraform apply)
+        - Service start (container start)
+        - Service script (sub-action)
+        - Init / docker+terraform install
+        - Vault integration
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: service
+    attributes:
+      label: Service (if applicable)
+      placeholder: "postgres / vault / rabbitmq / mailpit"
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      placeholder: |
+        Exact error message or behaviour. Paste terminal output.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. sudo bash main.sh
+        2. Select ...
+        3. ...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: container-state
+    attributes:
+      label: Container state when bug hit
+      options:
+        - Absent (never created)
+        - Stopped
+        - Running
+        - Unknown
+
+  - type: input
+    id: distro
+    attributes:
+      label: Distro + Docker version
+      placeholder: "Ubuntu 24.04 / Docker 26.1"
+    validations:
+      required: true

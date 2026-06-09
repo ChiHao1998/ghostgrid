@@ -1,0 +1,61 @@
+name: Feature Request
+description: TUI improvement, new behaviour, DX change, or new service
+labels: ["enhancement"]
+body:
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - New service
+        - TUI / menu
+        - Service action / script
+        - Init / install
+        - Shared lib (lib/)
+        - Logging
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / motivation
+      placeholder: Current behaviour that's annoying or missing
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+    validations:
+      required: true
+
+  - type: textarea
+    id: new-service-details
+    attributes:
+      label: New service details (if area = New service)
+      description: Skip if not adding a service
+      placeholder: |
+        Service name: redis
+        Docker image: redis:7-alpine
+        Port: 6379
+        Volume: $HOME/.redis → /data
+        Sub-actions: flush-db.sh, cli.sh
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+
+  - type: checkboxes
+    id: constraints
+    attributes:
+      label: Constraints to keep in mind
+      options:
+        - label: No alternate screen (`smcup`/`rmcup`) — flowing output only
+        - label: No package manager / build step — pure bash
+        - label: Must work on fresh machine (absent container state)
+        - label: Service scripts run as invoking user (no sudo)
+        - label: New service — `run.sh` follows `smart_install` pattern, Terraform in `install/`

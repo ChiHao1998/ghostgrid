@@ -1,0 +1,39 @@
+name: Chore
+description: Dependency update, CI change, config cleanup, non-code maintenance
+labels: ["chore"]
+body:
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - CI / GitHub Actions
+        - Docker image version bump
+        - Terraform provider version bump
+        - Config / env defaults
+        - Docs / CLAUDE.md / CONTEXT.md
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What needs doing
+    validations:
+      required: true
+
+  - type: textarea
+    id: why
+    attributes:
+      label: Why now
+      placeholder: CVE, deprecation notice, drift from upstream, etc.
+
+  - type: checkboxes
+    id: risk
+    attributes:
+      label: Risk check
+      options:
+        - label: Terraform provider bump — plan output verified before apply
+        - label: Docker image bump — tested container starts and service is healthy
+        - label: No behaviour change expected
