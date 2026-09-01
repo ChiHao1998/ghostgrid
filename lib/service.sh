@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
 
+# kreuzwerker/docker provider talks to whatever $DOCKER_HOST points at; default
+# it to the invoking user's rootless podman socket (enabled once, per-user, by
+# enable_podman_socket in script/init.sh) so service scripts never need root.
+: "${DOCKER_HOST:=unix://${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/podman/podman.sock}"
+export DOCKER_HOST
+
 smart_install() {
     local container="$1" tf_dir="$2"
     shift 2
@@ -10,7 +16,7 @@ smart_install() {
     fi
 
     local state
-    state=$(docker inspect --format '{{.State.Status}}' "$container" 2>/dev/null || true)
+    state=$(podman inspect --format '{{.State.Status}}' "$container" 2>/dev/null || true)
     [[ -z "$state" ]] && state="absent"
 
     case "$state" in
@@ -46,7 +52,7 @@ run_service() {
 smart_uninstall() {
     local container="$1" tf_dir="$2"
     local state
-    state=$(docker inspect --format '{{.State.Status}}' "$container" 2>/dev/null || true)
+    state=$(podman inspect --format '{{.State.Status}}' "$container" 2>/dev/null || true)
     if [[ -z "$state" ]]; then
         log INFO "$container already absent"
         return 0

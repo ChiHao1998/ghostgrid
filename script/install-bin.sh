@@ -6,7 +6,7 @@ BIN=/usr/local/bin/ghostgrid
 
 cat > "$BIN" <<EOF
 #!/usr/bin/env bash
-exec sudo bash "$REPO_DIR/main.sh" "\$@"
+exec bash "$REPO_DIR/main.sh" "\$@"
 EOF
 
 chmod +x "$BIN"

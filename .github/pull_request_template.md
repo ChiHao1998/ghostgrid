@@ -18,7 +18,7 @@
 
 ## Checklist
 
-- [ ] `sudo bash main.sh` runs without errors
+- [ ] `bash main.sh` runs without errors (no top-level sudo)
 - [ ] New service: follows `smart_install` pattern, state-routes correctly (absent → apply, stopped → start, running → log)
 - [ ] New service: `run.sh` exists (triggers discovery), Terraform in `services/<name>/install/`
 - [ ] Vars passed via `-var=` at apply time, not hardcoded in `.tf`

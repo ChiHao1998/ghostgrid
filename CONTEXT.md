@@ -2,7 +2,7 @@
 
 ## What it is
 
-Personal tool. Replaces memorizing Docker/Terraform commands to set up local dev services (postgres, vault, rabbitmq, mailpit) on a new machine. Bash TUI — single entry: `sudo bash main.sh`.
+Personal tool. Replaces memorizing Podman/Terraform commands to set up local dev services (postgres, vault, rabbitmq, mailpit) on a new machine. Bash TUI — single entry: `bash main.sh`.
 
 **Not** a team onboarding tool. Opinionated defaults (`$HOME/.postgres`, `$HOME/.vault`) are intentional.
 
@@ -132,7 +132,7 @@ Sub-scripts in `services/<name>/script/*.sh` discovered at runtime. Any `.sh` dr
 Shell vars (`$DATA_DIR`, `$PG_USER`, etc.) passed via `-var=` at `apply` time, not baked into `.tf`. Same plan works across users/environments.
 
 ### sudo scope
-`main.sh` requires sudo only for `script/init.sh` (Docker + Terraform install). Service `run.sh` scripts run as invoking user (no sudo inside `tui_run_service`).
+`main.sh` runs unprivileged. It internally elevates only its own call to `script/init.sh` (Podman + Terraform install, always via `sudo bash script/init.sh`). Service `run.sh` scripts run as invoking user against podman's *rootless* per-user socket (no sudo inside `tui_run_service`); `init.sh` enables that socket for `$SUDO_USER`, not a system-wide rootful one.
 
 ### log_prompt writes to /dev/tty
 `log_prompt` uses `>/dev/tty` so prompts appear even when stdout piped. `read` in sub-scripts uses `</dev/tty` same reason.
@@ -142,7 +142,7 @@ Shell vars (`$DATA_DIR`, `$PG_USER`, etc.) passed via `-var=` at `apply` time, n
 ## Adding a service checklist
 
 1. `services/<name>/run.sh` — call `smart_install CONTAINER "$SCRIPT_DIR/install" [TF_VAR_ARGS...]`; do pre-apply setup (e.g. `mkdir -p`) before call
-2. `services/<name>/install/main.tf` — Docker provider config
+2. `services/<name>/install/main.tf` — Docker provider config (talks to Podman via `$DOCKER_HOST`, see `lib/service.sh`)
 3. If runtime vars needed: `variables.tf` + trailing `-var=` args to `smart_install`
 4. Optional: `services/<name>/script/*.sh` for post-install ops; source via `$GHOSTGRID_ROOT`
 5. All scripts begin with `: "${GHOSTGRID_ROOT:?must invoke via main.sh}"`

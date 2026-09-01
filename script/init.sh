@@ -31,25 +31,45 @@ detect_distro() {
     fi
 }
 
-install_docker() {
+install_podman() {
     local distro; distro=$(detect_distro)
     case "$distro" in
         arch|manjaro)
-            pacman -Sy --noconfirm docker
-            systemctl enable --now docker
+            pacman -Sy --noconfirm podman podman-docker
             ;;
         alpine)
-            apk add --no-cache docker
-            rc-update add docker boot
-            service docker start
+            apk add --no-cache podman
+            ;;
+        ubuntu|debian|linuxmint|pop|kali|raspbian)
+            apt-get update -q
+            apt-get install -y podman podman-docker
+            ;;
+        centos|rhel|fedora|rocky|almalinux|ol)
+            dnf install -y podman podman-docker
             ;;
         *)
-            download https://get.docker.com /tmp/get-docker.sh
-            sh /tmp/get-docker.sh
-            rm -f /tmp/get-docker.sh
+            log ERROR "unsupported distro for podman install: $distro"; exit 1
             ;;
     esac
-    [ -n "$SUDO_USER" ] && usermod -aG docker "$SUDO_USER" 2>/dev/null || true
+}
+
+enable_podman_socket() {
+    # Podman's API socket needs to be up before service scripts can reach it via
+    # $DOCKER_HOST. Runs every time (not just on fresh install) since a
+    # pre-existing podman package rarely ships with the socket pre-enabled.
+    # This script itself needs root (package install), but service scripts run
+    # as the invoking user against their own rootless socket — so enable the
+    # *user* unit ($SUDO_USER, i.e. whoever ran sudo), not the system-wide one.
+    if [ -z "$SUDO_USER" ]; then
+        log WARN "no SUDO_USER — skipping rootless podman.socket enable (run init.sh via sudo as a regular user)"
+        return 0
+    fi
+    local uid; uid=$(id -u "$SUDO_USER")
+    # Lets the user's systemd instance (and its podman.socket) keep running
+    # without an active login session, e.g. across terminal restarts.
+    loginctl enable-linger "$SUDO_USER"
+    sudo -u "$SUDO_USER" XDG_RUNTIME_DIR="/run/user/$uid" \
+        systemctl --user enable --now podman.socket
 }
 
 install_jq() {
@@ -128,13 +148,14 @@ install_terraform() {
 
 # ── main ─────────────────────────────────────────────────────────────────────
 
-if has docker; then
-    log INFO "docker: $(docker --version)"
+if has podman; then
+    log INFO "podman: $(podman --version)"
 else
-    log WARN "docker not found — installing..."
-    install_docker
-    log SUCCESS "docker installed — $(docker --version)"
+    log WARN "podman not found — installing..."
+    install_podman
+    log SUCCESS "podman installed — $(podman --version)"
 fi
+enable_podman_socket
 
 if has terraform; then
     log INFO "terraform: $(terraform --version | head -1)"
