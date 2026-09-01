@@ -7,24 +7,24 @@
  ╚═════╝ ╚═╝  ╚═╝ ╚═════╝ ╚══════╝   ╚═╝    ╚═════╝ ╚═╝  ╚═╝╚═╝╚═════╝
 ```
 
-Bash TUI that bootstraps local dev infra — postgres, vault, rabbitmq, mailpit — via Docker + Terraform. Single entry point, no package manager, no build step.
+Bash TUI that bootstraps local dev infra — postgres, vault, rabbitmq, mailpit — via Podman + Terraform. Single entry point, no package manager, no build step.
 
 ## Why
 
-Replace memorizing Docker/Terraform commands on every new machine. `sudo bash main.sh`, pick a service, done.
+Replace memorizing Podman/Terraform commands on every new machine. `bash main.sh`, pick a service, done.
 
 ## Requirements
 
-- Docker
+- Podman
 - Terraform
 - Linux (multi-distro install via `script/init.sh`)
 
-If not installed: run `bash script/init.sh` first (requires sudo), or let `main.sh` do it on first launch.
+If not installed: run `sudo bash script/init.sh` first, or let `main.sh` do it on first launch.
 
 ## Usage
 
 ```bash
-sudo bash main.sh
+bash main.sh
 ```
 
 Or install the `ghostgrid` bin (once, requires sudo):
@@ -34,7 +34,7 @@ sudo bash script/install-bin.sh
 ghostgrid
 ```
 
-Sudo required only for initial Docker + Terraform install. Service scripts run as invoking user.
+`main.sh` runs unprivileged and internally elevates (`sudo`) only its own call to `script/init.sh` for the initial Podman + Terraform install. Services run rootless — containers live under your user's own podman socket, not root's.
 
 ## Services
 
@@ -53,7 +53,7 @@ Each service uses the `smart_install` pattern:
 
 ```
 container absent  →  terraform apply  (create)
-container stopped →  docker start
+container stopped →  podman start
 container running →  stream logs
 ```
 
@@ -68,7 +68,7 @@ main.sh                      entry, service discovery, main loop
 script/
   tui.sh                     flowing TUI — inline menus, scrolling output
   logger.sh                  log() helper
-  init.sh                    Docker + Terraform install (sudo)
+  init.sh                    Podman + Terraform install (sudo)
 lib/
   service.sh                 smart_install shared helper
   vault.sh                   Vault API helpers
