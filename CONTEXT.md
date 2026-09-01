@@ -2,7 +2,7 @@
 
 ## What it is
 
-Personal tool. Replaces memorizing Podman/Terraform commands to set up local dev services (postgres, vault, rabbitmq, mailpit) on a new machine. Bash TUI — single entry: `bash main.sh`.
+Personal tool. Replaces memorizing Podman commands to set up local dev services (postgres, vault, rabbitmq, mailpit) on a new machine. Bash TUI — single entry: `bash main.sh`.
 
 **Not** a team onboarding tool. Opinionated defaults (`$HOME/.postgres`, `$HOME/.vault`) are intentional.
 
@@ -13,11 +13,11 @@ Personal tool. Replaces memorizing Podman/Terraform commands to set up local dev
 | Term | Meaning |
 |------|---------|
 | **service** | Infra component (e.g. `postgres`). Defined by `services/<name>/`. |
-| **install** | Primary action: run `services/<name>/run.sh`. Creates container via Terraform if absent, starts if stopped. |
+| **install** | Primary action: run `services/<name>/run.sh`. Creates container via `podman run` if absent, starts if stopped. |
 | **script** | Optional sub-action: any `.sh` in `services/<name>/script/`. Shown in action menu after install. Owned by *consumer* — scripts live under the service that needs them, even if they touch another service (e.g. postgres owns its Vault integration scripts). |
-| **absent** | Container state: never created. Triggers `terraform apply`. |
+| **absent** | Container state: never created. Triggers `podman run` (create). |
 | **flowing output** | TUI design constraint: no alternate screen, no fixed regions. Output scrolls naturally. Menus redraw inline. |
-| **smart-install** | Pattern in every `run.sh`: inspect container state → route to start/apply/log. Idempotent. Impl as `smart_install CONTAINER TF_DIR [TF_VAR_ARGS...]` in `lib/service.sh`. |
+| **smart-install** | Pattern in every `run.sh`: inspect container state → route to create/start/log. Idempotent. Impl as `smart_install CONTAINER IMAGE [run-args...] [-- CMD...]` in `lib/service.sh`. |
 | **GHOSTGRID_ROOT** | Env var exported by `main.sh`. Absolute path to repo root. All scripts source shared libs via `$GHOSTGRID_ROOT/...` not relative `../` chains. |
 
 ---
@@ -54,9 +54,7 @@ main.sh
 ```
 services/<name>/
   run.sh          ← smart-install (required — presence triggers discovery)
-  install/        ← Terraform root (all services use this subdirectory)
-    main.tf
-    variables.tf
+                    calls smart_install CONTAINER IMAGE [podman run args...]
   config/         ← static config mounted into container (vault only)
   script/         ← optional sub-actions shown in action menu
     *.sh
@@ -82,15 +80,13 @@ Shared lib sourced by vault scripts and postgres vault-integration scripts.
 ### mailpit
 - Image: `axllent/mailpit:latest`
 - Ports: SMTP `:1025`, UI `:8025`
-- Terraform: `services/mailpit/install/`
-- No `variables.tf` — no runtime vars needed
+- `services/mailpit/run.sh` — no volumes/vars needed
 
 ### postgres
 - Image: `postgres:16`
 - Port: `:5432`
 - Data: `$HOME/.postgres` (host volume)
-- Terraform: `services/postgres/install/` (subdirectory)
-- Runtime vars: `-var="data_dir=$DATA_DIR"` passed at apply
+- `services/postgres/run.sh` — `mkdir -p` the data dir, then `-v "$DATA_DIR:/var/lib/postgresql/data"`
 - Sub-scripts:
   - `create-quartz-role.sh` — creates DB user + schema for Quartz scheduler (interactive)
   - `vault-create-database-engine.sh` — configures Vault database secrets engine for postgres
@@ -99,16 +95,15 @@ Shared lib sourced by vault scripts and postgres vault-integration scripts.
 ### rabbitmq
 - Image: `rabbitmq:3-management`
 - Ports: AMQP `:5672`, UI `:15672`
-- Terraform: `services/rabbitmq/install/`
-- No `variables.tf`
+- `services/rabbitmq/run.sh` — no volumes/vars needed
 
 ### vault
 - Image: `hashicorp/vault:latest`
 - Port: `:8200`
 - Data: `$HOME/.vault` (host volume)
 - Config: `services/vault/config/` → mounted at `/vault/config`
-- Requires `IPC_LOCK` capability
-- Terraform: `services/vault/install/` (subdirectory)
+- Requires `IPC_LOCK` capability (`--cap-add IPC_LOCK`)
+- Command: `vault server -config=/vault/config/vault-config.json`, passed after `--` to `smart_install`
 - Sub-scripts:
   - `create-admin.sh` — enables userpass auth, creates admin user, merges admin policy (idempotent)
   - `create-kv-engine.sh` — enables KV v2 secrets engine at given path (idempotent)
@@ -128,11 +123,14 @@ No hardcoded service list. `main.sh` globs `services/*/run.sh`. Add `run.sh` to 
 ### Action menu dynamics
 Sub-scripts in `services/<name>/script/*.sh` discovered at runtime. Any `.sh` dropped there appears as action option alongside `install`.
 
-### Terraform vars at runtime
-Shell vars (`$DATA_DIR`, `$PG_USER`, etc.) passed via `-var=` at `apply` time, not baked into `.tf`. Same plan works across users/environments.
+### Runtime vars
+Shell vars (`$DATA_DIR`, etc.) are just interpolated into the `podman run` args passed to `smart_install` (e.g. `-v "$DATA_DIR:/var/lib/postgresql/data"`). Same `run.sh` works across users/environments since `$HOME`-relative paths are computed at call time, not hardcoded.
 
 ### sudo scope
-`main.sh` runs unprivileged. It internally elevates only its own call to `script/init.sh` (Podman + Terraform install, always via `sudo bash script/init.sh`). Service `run.sh` scripts run as invoking user against podman's *rootless* per-user socket (no sudo inside `tui_run_service`); `init.sh` enables that socket for `$SUDO_USER`, not a system-wide rootful one.
+`main.sh` refuses to run as root (`$EUID -eq 0` check near the top) — it must run as the target user so containers land in that user's own rootless podman storage, not root's. It internally elevates only its own call to `script/init.sh` (checks Podman is present, installs `jq`, always via `sudo bash script/init.sh`). Service `run.sh` scripts run as the invoking user, calling the `podman` CLI directly against that user's own rootless storage (no sudo inside `tui_run_service`, no daemon/socket to enable).
+
+### podman install is manual
+`script/init.sh` does not install Podman — there's no install method that's actually the same across every distro (unlike `jq`, which ships a static binary). It just checks `has podman` and errors out with a link if missing, leaving the "how" to the user's own OS/distro.
 
 ### log_prompt writes to /dev/tty
 `log_prompt` uses `>/dev/tty` so prompts appear even when stdout piped. `read` in sub-scripts uses `</dev/tty` same reason.
@@ -141,8 +139,7 @@ Shell vars (`$DATA_DIR`, `$PG_USER`, etc.) passed via `-var=` at `apply` time, n
 
 ## Adding a service checklist
 
-1. `services/<name>/run.sh` — call `smart_install CONTAINER "$SCRIPT_DIR/install" [TF_VAR_ARGS...]`; do pre-apply setup (e.g. `mkdir -p`) before call
-2. `services/<name>/install/main.tf` — Docker provider config (talks to Podman via `$DOCKER_HOST`, see `lib/service.sh`)
-3. If runtime vars needed: `variables.tf` + trailing `-var=` args to `smart_install`
-4. Optional: `services/<name>/script/*.sh` for post-install ops; source via `$GHOSTGRID_ROOT`
-5. All scripts begin with `: "${GHOSTGRID_ROOT:?must invoke via main.sh}"`
+1. `services/<name>/run.sh` — source `$GHOSTGRID_ROOT/lib/service.sh`, do any pre-run setup (e.g. `mkdir -p "$DATA_DIR"`), then call `smart_install CONTAINER IMAGE [podman run args...] [-- CMD...]`
+2. If the image needs a non-default command (e.g. vault), append it after a bare `--`
+3. Optional: `services/<name>/script/*.sh` for post-install ops; source via `$GHOSTGRID_ROOT`
+4. All scripts begin with `: "${GHOSTGRID_ROOT:?must invoke via main.sh}"`

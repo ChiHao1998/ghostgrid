@@ -58,4 +58,4 @@ body:
         - label: No package manager / build step — pure bash
         - label: Must work on fresh machine (absent container state)
         - label: Service scripts run as invoking user (no sudo)
-        - label: New service — `run.sh` follows `smart_install` pattern, Terraform in `install/`
+        - label: New service — `run.sh` follows `smart_install` pattern (`smart_install CONTAINER IMAGE [podman run args...]`)

@@ -9,7 +9,6 @@ body:
       options:
         - CI / GitHub Actions
         - Docker image version bump
-        - Terraform provider version bump
         - Config / env defaults
         - Docs / CLAUDE.md / CONTEXT.md
         - Other
@@ -34,6 +33,5 @@ body:
     attributes:
       label: Risk check
       options:
-        - label: Terraform provider bump — plan output verified before apply
         - label: Docker image bump — tested container starts and service is healthy
         - label: No behaviour change expected

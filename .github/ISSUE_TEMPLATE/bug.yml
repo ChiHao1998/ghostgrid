@@ -1,5 +1,5 @@
 name: Bug Report
-description: Something broken — TUI, service, Terraform, init
+description: Something broken — TUI, service, podman, init
 labels: ["bug"]
 body:
   - type: dropdown
@@ -8,10 +8,10 @@ body:
       label: Area
       options:
         - TUI / menu navigation
-        - Service install (terraform apply)
+        - Service install (podman run)
         - Service start (container start)
         - Service script (sub-action)
-        - Init / docker+terraform install
+        - Init / podman install
         - Vault integration
         - Other
     validations:
@@ -63,7 +63,7 @@ body:
   - type: input
     id: distro
     attributes:
-      label: Distro + Docker version
-      placeholder: "Ubuntu 24.04 / Docker 26.1"
+      label: Distro + Podman version
+      placeholder: "Ubuntu 24.04 / Podman 5.1"
     validations:
       required: true

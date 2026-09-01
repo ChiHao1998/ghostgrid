@@ -1,15 +1,3 @@
-# Terraform
-.terraform/
-.terraform.lock.hcl
-*.tfstate
-*.tfstate.*
-
-# Terraform variables (often secrets)
-*.tfvars
-
-# Vault data (CRITICAL)
-terraform/vault/data/
-
 # Python
 .venv/
 venv/

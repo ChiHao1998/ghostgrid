@@ -6,6 +6,13 @@ export GHOSTGRID_ROOT="$SCRIPT_DIR"
 source "$SCRIPT_DIR/script/logger.sh"
 source "$SCRIPT_DIR/script/tui.sh"
 
+if [[ "$EUID" -eq 0 ]]; then
+    log ERROR "don't run main.sh with sudo — it self-elevates only for init.sh."
+    log ERROR "containers must be created under your own user's rootless podman storage, not root's."
+    log ERROR "run: bash main.sh"
+    exit 1
+fi
+
 SERVICES_DIR="$SCRIPT_DIR/services"
 service_names=()
 declare -A service_map
@@ -18,10 +25,6 @@ for dir in "$SERVICES_DIR"/*/; do
         log WARN "service '$name': run.sh not executable — skipped"
         continue
     fi
-    if [[ ! -d "${dir}install" ]]; then
-        log WARN "service '$name': install/ dir missing — skipped"
-        continue
-    fi
     service_names+=("$name")
     service_map["$name"]="$script"
 done
@@ -29,10 +32,14 @@ done
 tui_init
 tui_draw_header "${#service_names[@]}"
 
-while IFS= read -r line; do
+exec 5< <(sudo bash "$SCRIPT_DIR/script/init.sh" 2>&1)
+init_pid=$!
+while IFS= read -r line <&5; do
     line="${line/$'\r'/}"
     printf '  %s\n' "$line"
-done < <(sudo bash "$SCRIPT_DIR/script/init.sh" 2>&1)
+done
+exec 5<&-
+wait "$init_pid" || exit 1
 echo ""
 
 while true; do

@@ -7,25 +7,26 @@
  ╚═════╝ ╚═╝  ╚═╝ ╚═════╝ ╚══════╝   ╚═╝    ╚═════╝ ╚═╝  ╚═╝╚═╝╚═════╝
 ```
 
-Bash TUI that bootstraps local dev infra — postgres, vault, rabbitmq, mailpit — via Podman + Terraform. Single entry point, no package manager, no build step.
+Bash TUI that bootstraps local dev infra — postgres, vault, rabbitmq, mailpit — via Podman. Single entry point, no package manager, no build step.
 
 ## Why
 
-Replace memorizing Podman/Terraform commands on every new machine. `bash main.sh`, pick a service, done.
+Replace memorizing Podman commands on every new machine. `bash main.sh`, pick a service, done.
 
 ## Requirements
 
 - Podman
-- Terraform
-- Linux (multi-distro install via `script/init.sh`)
+- Linux
 
-If not installed: run `sudo bash script/init.sh` first, or let `main.sh` do it on first launch.
+`script/init.sh` checks for Podman (and installs `jq` itself if missing) — it does not install Podman for you, since there's no single install method that works the same across every distro. If Podman is missing, install it yourself ([podman.io/docs/installation](https://podman.io/docs/installation)) then run `sudo bash script/init.sh`, or just let `main.sh` run the same check on first launch.
 
 ## Usage
 
 ```bash
 bash main.sh
 ```
+
+Run it as your normal user — never with `sudo`. `main.sh` refuses to start as root (containers must land in your own rootless podman storage, not root's); it elevates only its own internal call to `script/init.sh`.
 
 Or install the `ghostgrid` bin (once, requires sudo):
 
@@ -34,7 +35,7 @@ sudo bash script/install-bin.sh
 ghostgrid
 ```
 
-`main.sh` runs unprivileged and internally elevates (`sudo`) only its own call to `script/init.sh` for the initial Podman + Terraform install. Services run rootless — containers live under your user's own podman socket, not root's.
+`main.sh` runs unprivileged and internally elevates (`sudo`) only its own call to `script/init.sh` for the initial Podman install. Services run rootless — containers live under your user's own podman storage, not root's.
 
 ## Services
 
@@ -52,7 +53,7 @@ Service discovery: `main.sh` globs `services/*/run.sh`. Any directory with a `ru
 Each service uses the `smart_install` pattern:
 
 ```
-container absent  →  terraform apply  (create)
+container absent  →  podman run  (create)
 container stopped →  podman start
 container running →  stream logs
 ```
@@ -68,14 +69,13 @@ main.sh                      entry, service discovery, main loop
 script/
   tui.sh                     flowing TUI — inline menus, scrolling output
   logger.sh                  log() helper
-  init.sh                    Podman + Terraform install (sudo)
+  init.sh                    Checks podman present, installs jq (sudo)
 lib/
   service.sh                 smart_install shared helper
   vault.sh                   Vault API helpers
 services/
   <name>/
-    run.sh                   smart-install entrypoint (required)
-    install/                 Terraform root (main.tf, variables.tf)
+    run.sh                   smart-install entrypoint (required) — image + podman run args
     script/                  optional sub-actions
     config/                  static config (vault only)
 ```
